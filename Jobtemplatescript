@@ -1,0 +1,42 @@
+#!/bin/bash
+
+# Ansible Tower API credentials
+TOWER_HOST="tower.example.com"
+TOWER_USERNAME="admin"
+TOWER_PASSWORD="password"
+
+# API endpoint for organizations
+ORG_API_ENDPOINT="/api/v2/organizations/"
+
+# API endpoint for job templates
+JOB_TEMPLATE_API_ENDPOINT="/api/v2/job_templates/"
+
+# CSV file path
+CSV_FILE="job_templates_count.csv"
+
+# Create CSV file and add header
+echo "Organization,Job Templates Count" > "${CSV_FILE}"
+
+# Make API request to get organizations
+response=$(curl -s -u "${TOWER_USERNAME}:${TOWER_PASSWORD}" "https://${TOWER_HOST}${ORG_API_ENDPOINT}")
+
+# Check if the request was successful
+if [[ $(echo "${response}" | jq -r '.count') ]]; then
+  # Iterate over the organizations
+  for org in $(echo "${response}" | jq -r '.results[].name'); do
+    # Make API request to get job templates for the organization
+    job_templates_response=$(curl -s -u "${TOWER_USERNAME}:${TOWER_PASSWORD}" "https://${TOWER_HOST}${JOB_TEMPLATE_API_ENDPOINT}?organization__name=${org}")
+    
+    # Check if the request was successful
+    if [[ $(echo "${job_templates_response}" | jq -r '.count') ]]; then
+      # Get the count of job templates
+      count=$(echo "${job_templates_response}" | jq -r '.count')
+      
+      echo "${org},${count}" >> "${CSV_FILE}"
+    else
+      echo "Failed to retrieve job templates for organization '${org}'. Error message: ${job_templates_response}"
+    fi
+  done
+else
+  echo "Failed to retrieve organizations. Error message: ${response}"
+fi
